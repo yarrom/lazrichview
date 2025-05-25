@@ -602,7 +602,7 @@ begin
   FSelStartOffs := 0;
   FSelEndOffs := 0;
   if VisItems[FSelEndNo].StyleNo >= 0 then
-    FSelEndOffs := UTF8Length(VisItems[FSelEndNo].Text) + 1;
+    FSelEndOffs := {$IFDEF FPC}UTF8{$ENDIF}Length(VisItems[FSelEndNo].Text) + 1;
   if Assigned(FOnSelect) then OnSelect(Self);
 end;
 
@@ -1009,6 +1009,37 @@ begin
   end;
 end;
 
+{$IFNDEF FPC}
+function RPos(Substr: string; S: string): Integer;
+var
+  i: Integer;
+begin
+  Result := 0;
+  if ((Length(S) > 0) and (Length(Substr) > 0)) then
+    if (Length(S) >= Length(Substr)) then
+      for i:= (Length(S) - Length(Substr)) downto 1 do
+        if (Copy(S, i, Length(Substr)) = Substr) then
+        begin
+          Result := i;
+          Exit;
+        end;
+end;
+{$ENDIF}
+
+function TextFitInfo(ACanvas: TCanvas; AText: String; AMaxWidth: Integer): Integer;
+{$IFNDEF FPC}
+var
+  sz: TSize;
+{$ENDIF}
+begin
+{$IFDEF FPC}
+  Result := ACanvas.TextFitInfo(AText, AMaxWidth);
+{$ELSE}
+  GetTextExtentExPoint(ACanvas.Handle, PChar(AText), Length(AText), AMaxWidth,
+      @Result, nil, sz);
+{$ENDIF}
+end;
+
 procedure TCustomRichView.FormatTextItem(ItemId: Integer; var x, baseline,
   prevdesc, prevabove: Integer; ACanvas: TCanvas; const sad: TScreenAndDevice);
 var
@@ -1029,7 +1060,7 @@ begin
 
   // length of source string
   sourceStr := Item.Text;
-  sourceStrLen := UTF8Length(sourceStr);
+  sourceStrLen := {$IFDEF FPC}UTF8{$ENDIF}Length(sourceStr);
   strForAdd := '';
 
   if FPrevStyleNo <> Item.StyleNo then
@@ -1058,19 +1089,19 @@ begin
     sz.cx := 0;
     sz.cy := 0;
     // get number of characters that will fit in specified width
-    maxChars := ACanvas.TextFitInfo(sourceStr, iTextWidth-x);
+    maxChars := TextFitInfo(ACanvas, sourceStr, iTextWidth-x);
     if maxChars = 0 then
       maxChars := 1;
 
-    strForAdd := UTF8Copy(sourceStr, 1, maxChars);
+    strForAdd := {$IFDEF FPC}UTF8{$ENDIF}Copy(sourceStr, 1, maxChars);
     if maxChars < sourceStrLen then
     begin
       // source text not fit to line, need split at space char
-      strSpacePos := UTF8RPos(' ', strForAdd);
+      strSpacePos := {$IFDEF FPC}UTF8{$ENDIF}RPos(' ', strForAdd);
       if strSpacePos > 1 then
       begin
         maxChars := strSpacePos;
-        strForAdd := UTF8Copy(sourceStr, 1, maxChars);
+        strForAdd := {$IFDEF FPC}UTF8{$ENDIF}Copy(sourceStr, 1, maxChars);
       end
       else
       begin
@@ -1082,7 +1113,7 @@ begin
         end;
       end;
     end;
-    if (Offs > 1) or (maxChars < UTF8Length(Item.Text)) then
+    if (Offs > 1) or (maxChars < {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text)) then
     begin
       // add subitem
       SubItem := FSubItems.AddSubItem();
@@ -1095,7 +1126,7 @@ begin
     CurItem.TextOffs := Offs; // offset in source text
 
     Inc(Offs, maxChars);
-    sourceStr := UTF8Copy(Item.Text, Offs+1, MaxInt);
+    sourceStr := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, Offs+1, MaxInt);
 
     sz := ACanvas.TextExtent(strForAdd);
     if not IsNewLine then
@@ -1151,7 +1182,7 @@ begin
       Item.JumpId := nJmps;
       FJumpList.Add(JmpInfo);
     end;
-    sourceStrLen := UTF8Length(sourceStr);
+    sourceStrLen := {$IFDEF FPC}UTF8{$ENDIF}Length(sourceStr);
     if IsNewLine or (prevDesc < FTextMetr.tmDescent) then
       prevDesc := FTextMetr.tmDescent;
     Inc(x, sz.cx);
@@ -1566,9 +1597,7 @@ var
   canv: TCanvas;
   s, s1: String;
   StartNo, EndNo, StartOffs, EndOffs: Integer;
-  {$IFDEF FPC}
   st: string;
-  {$ENDIF}
   {$ifdef DEBUG}
   MouseItemId: Integer;
   MouseTextOffs: Integer;
@@ -1657,7 +1686,7 @@ begin
         else
         if ((StartNo < i) and (EndNo > i))
         or ((StartNo = i) and (EndNo <> i) and (StartOffs <= 1))
-        or ((StartNo <> i) and (EndNo = i) and (EndOffs >= UTF8Length(VisItems[i].Text)))
+        or ((StartNo <> i) and (EndNo = i) and (EndOffs >= {$IFDEF FPC}UTF8{$ENDIF}Length(VisItems[i].Text)))
         then
         begin
           canv.Brush.Style := bsSolid;
@@ -1677,16 +1706,16 @@ begin
         begin
           canv.Font.Color := TextColor;
           //s := UTF8Copy(Item.Text, 1, StartOffs-1);
-          s := UTF8Copy(Item.Text, 1, StartOffs);
+          s := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, 1, StartOffs);
           canv.TextOut(Item.Left-xshift, Item.Top-yshift, s);
           canv.Brush.Style := bsSolid;
           canv.Brush.Color := FStyle.SelColor;
           if not IsHoverNow then
             canv.Font.Color := FStyle.SelTextColor;
-          if (i <> EndNo) or (EndOffs >= UTF8Length(Item.Text)) then
+          if (i <> EndNo) or (EndOffs >= {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text)) then
           begin
             //st := UTF8Copy(Item.Text, StartOffs, UTF8Length(Item.Text));
-            st := UTF8Copy(Item.Text, StartOffs+1, UTF8Length(Item.Text));
+            st := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, StartOffs+1, {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text));
             {$IFDEF FPC}
             //TxtOut(canv, Item.Left-xshift + canv.TextWidth(s), Item.Top-yshift, st, Item);
             canv.TextOut(Item.Left-xshift + canv.TextWidth(s), Item.Top-yshift, st);
@@ -1698,7 +1727,7 @@ begin
           else
           begin
             //s1 := UTF8Copy(Item.Text, StartOffs, EndOffs-StartOffs);
-            s1 := UTF8Copy(Item.Text, StartOffs+1, EndOffs-StartOffs);
+            s1 := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, StartOffs+1, EndOffs-StartOffs);
             {$IFDEF FPC}
             TxtOut(canv, Item.Left - xshift + canv.TextWidth(s), Item.Top-yshift, s1, Item);
             {$ELSE}
@@ -1707,7 +1736,7 @@ begin
             canv.Font.Color := TextColor;
             canv.Brush.Style := bsClear;
             //st := UTF8Copy(Item.Text, EndOffs, UTF8Length(Item.Text));
-            st := UTF8Copy(Item.Text, EndOffs+1, UTF8Length(Item.Text));
+            st := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, EndOffs+1, {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text));
             canv.TextOut(Item.Left - xshift + canv.TextWidth(s+s1), Item.Top-yshift, st);
           end;
         end
@@ -1715,7 +1744,7 @@ begin
         if (EndNo = i) then
         begin
           //s := UTF8Copy(Item.Text, 1, EndOffs-1);
-          s := UTF8Copy(Item.Text, 1, EndOffs);
+          s := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, 1, EndOffs);
           canv.Brush.Style := bsSolid;
           canv.Brush.Color := FStyle.SelColor;
           if (not IsHoverNow) then
@@ -1728,7 +1757,7 @@ begin
           canv.Brush.Style := bsClear;
           canv.Font.Color := TextColor;
           //st := UTF8Copy(Item.Text, EndOffs, UTF8Length(Item.Text));
-          st := UTF8Copy(Item.Text, EndOffs+1, UTF8Length(Item.Text));
+          st := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, EndOffs+1, {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text));
           {$IFDEF FPC}
           TxtOut(canv, Item.Left - xshift + canv.TextWidth(s), Item.Top - yshift, st, Item);
           {$ELSE}
@@ -1748,7 +1777,7 @@ begin
           canv.Brush.Style := bsClear;
           if MouseTextOffs > 0 then
           begin
-            r.Left := Item.Left - xshift + canv.GetTextWidth(UTF8Copy(Item.Text, 1, MouseTextOffs-1));
+            r.Left := Item.Left - xshift + canv.{$IFDEF FPC}Get{$ENDIF}TextWidth({$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, 1, MouseTextOffs-1));
             r.Right := r.Left + 4;
             canv.Brush.Style := bsSolid;
             canv.Brush.Color := clRed;
@@ -2400,7 +2429,7 @@ begin
     if ItemNo >= VisItems.Count then
     begin
       ItemNo := VisItems.Count-1;
-      TextOffs := UTF8Length(VisItems[ItemNo].Text);
+      TextOffs := {$IFDEF FPC}UTF8{$ENDIF}Length(VisItems[ItemNo].Text);
     end;
     {else
     begin
@@ -2432,7 +2461,7 @@ begin
         sz.cx := 0;
         sz.cy := 0;
         // get number of characters that will fit in specified width
-        TextOffs := Canvas.TextFitInfo(Item.Text, X - Item.Left);
+        TextOffs := TextFitInfo(Canvas, Item.Text, X - Item.Left);
         (*
         {$IFDEF FPC}
         MyGetTextExtentExPoint(Canvas.Handle, PChar(Item.Text), UTF8Length(Item.Text),
@@ -2448,9 +2477,9 @@ begin
                              sz);
         *)
         //Inc(TextOffs);
-        if TextOffs > UTF8Length(Item.Text) then
-          TextOffs := UTF8Length(Item.Text);
-        if (TextOffs < 0) and (UTF8Length(Item.Text) > 0) then
+        if TextOffs > {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text) then
+          TextOffs := {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text);
+        if (TextOffs < 0) and ({$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text) > 0) then
           TextOffs := 0;
       end
       else
@@ -2467,7 +2496,7 @@ begin
     if ItemNo = -2 then
     begin
       ItemNo := VisItems.Count - 1;
-      TextOffs := UTF8Length(VisItems[ItemNo].Text);
+      TextOffs := {$IFDEF FPC}UTF8{$ENDIF}Length(VisItems[ItemNo].Text);
     end;
     Exit;
   end;
@@ -2476,7 +2505,7 @@ begin
   begin
     if TextOffs < 0 then
     begin
-      TextOffs := UTF8Length(VisItems[ItemNo].Text);
+      TextOffs := {$IFDEF FPC}UTF8{$ENDIF}Length(VisItems[ItemNo].Text);
     end;
   end;
 end;
@@ -2521,7 +2550,7 @@ begin
   while (offs > 0) and (mid < VisItems.Count) do
   begin
     Item := VisItems[mid];
-    nLen := UTF8Length(Item.Text);
+    nLen := {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text);
     if offs <= nLen then
     begin
       VisTextOffs := offs;
@@ -2571,18 +2600,18 @@ begin
   if (no >= 0) and (offs >= 0) then
   begin
     sClickedWord := VisItems[no].Text;
-    iMaxPos := UTF8Length(sClickedWord);
+    iMaxPos := {$IFDEF FPC}UTF8{$ENDIF}Length(sClickedWord);
     // upper bound
     iTopPos := offs+1;
-    while (iTopPos < iMaxPos) and ((UTF8Pos(sClickedWord[iTopPos+1], Delimiters) = 0)) do
+    while (iTopPos < iMaxPos) and (({$IFDEF FPC}UTF8{$ENDIF}Pos(sClickedWord[iTopPos+1], Delimiters) = 0)) do
       Inc(iTopPos);
 
     // lower bound
     iLowPos := offs+1;
-    while (iLowPos > 2) and ((UTF8Pos(sClickedWord[iLowPos-1], Delimiters) = 0)) do
+    while (iLowPos > 2) and (({$IFDEF FPC}UTF8{$ENDIF}Pos(sClickedWord[iLowPos-1], Delimiters) = 0)) do
       Dec(iLowPos);
 
-    sClickedWord := UTF8Copy(sClickedWord, iLowPos, iTopPos-iLowPos);
+    sClickedWord := {$IFDEF FPC}UTF8{$ENDIF}Copy(sClickedWord, iLowPos, iTopPos-iLowPos);
   end;
   (*
   no := FindVisItemAtPos(ClickPos.X + HPos, ClickPos.Y + VPos * SmallStep);
@@ -2833,7 +2862,7 @@ begin
     Item := VisItems[StartNo];
     if Item.StyleNo < 0 then
       Exit;
-    Result := UTF8Copy(Item.Text, StartOffs+1, EndOffs-StartOffs);
+    Result := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, StartOffs+1, EndOffs-StartOffs);
     Exit;
   end
   else
@@ -2842,7 +2871,7 @@ begin
     if Item.StyleNo < 0 then
       s := ''
     else
-      s := UTF8Copy(Item.Text, StartOffs+1, UTF8Length(Item.Text));
+      s := {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, StartOffs+1, {$IFDEF FPC}UTF8{$ENDIF}Length(Item.Text));
 
     for i := StartNo + 1 to EndNo do
     begin
@@ -2854,7 +2883,7 @@ begin
         if i <> EndNo then
           s := s + Item.Text
         else
-          s := s + UTF8Copy(Item.Text, 1, EndOffs);
+          s := s + {$IFDEF FPC}UTF8{$ENDIF}Copy(Item.Text, 1, EndOffs);
       end;
     end;
     {$IFDEF FPC}
